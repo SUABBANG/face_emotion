@@ -42,6 +42,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_famework',
+    # local
+    'videoapp',
 ]
 
 MIDDLEWARE = [
@@ -80,8 +83,12 @@ WSGI_APPLICATION = 'face_emotion_project.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': env('DB_NAME'),
+        'USER': 'admin',
+        'PASSWORD': env('DB_PASSWORD'),
+        'HOST': env('HOST_NAME'),
+        'PORT': '3306'
     }
 }
 
