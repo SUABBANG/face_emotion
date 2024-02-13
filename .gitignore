@@ -29,6 +29,6 @@ ENV/
 .idea/
 **/__pycache__/
 
-videoapp/config/
-videoapp/trained_models/
+media/
+model/
 config/
