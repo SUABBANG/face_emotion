@@ -2,6 +2,7 @@ import os
 import cv2
 import numpy as np
 import heapq
+import boto3
 
 from keras.models import load_model
 from rest_framework.views import APIView
@@ -13,7 +14,7 @@ from tqdm import tqdm
 from collections import defaultdict
 from statistics import mode
 
-
+from face_emotion_project.settings import env
 from src.utils.datasets import get_labels
 from src.utils.inference import detect_faces
 from src.utils.inference import draw_text
@@ -21,7 +22,7 @@ from src.utils.inference import draw_bounding_box
 from src.utils.inference import apply_offsets
 from src.utils.inference import load_detection_model
 from src.utils.preprocessor import preprocess_input
-
+from videoapp.models import JudgeStatus
 
 # loading models
 detection_model_path = './model/haarcascade_frontalface_default.xml'
@@ -30,6 +31,43 @@ emotion_labels = get_labels('fer2013')
 
 face_detection = load_detection_model(detection_model_path)
 emotion_classifier = load_model(emotion_model_path, compile=False)
+
+from config import config
+# AWS
+BUCKET_NAME = config.aws_info['bucket_name']
+AWS_ACCESS_KEY_ID = config.aws_info['aws_access_key_id']
+AWS_SECRET_ACCESS_KEY = config.aws_info['aws_secret_access_key']
+REGION = config.aws_info['region']
+S3_VIDEO_PATH = 'ir_data/result_video'
+DATE_TIME = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+
+class GetS3FileList:
+    def __init__(self, prefix, aws_access_key_id, aws_secret_access_key, region, bucket_name, s3_video_path):
+        self.client = boto3.client('s3',
+                                   aws_access_key_id=aws_access_key_id,
+                                   aws_secret_access_key=aws_secret_access_key,
+                                   region_name=region)
+        self.prefix = prefix
+        self.bucket_name = bucket_name
+        self.s3_video_path = s3_video_path
+
+    def upload_mp4_file(self, file_name):
+        try:
+            local_file_path = f'{self.prefix}/{file_name}'
+            s3_upload_key = f'{self.s3_video_path}/{file_name}'
+
+            print(local_file_path)
+            print(s3_upload_key)
+
+            # S3 ���� ���ε� (�ۺ��� �б� ���� ����)
+            self.client.upload_file(local_file_path, self.bucket_name, s3_upload_key,
+                                    ExtraArgs={'ACL': 'public-read', 'ContentType': 'video/mp4'})
+
+            return s3_upload_key
+        except Exception as e:
+            print(e)
+            return False
+
 
 class video_emotion(APIView):
     # post
@@ -156,6 +194,19 @@ class video_emotion(APIView):
                 first_emotion, fir_count = most_common_emotions[0]
                 fir_proba = 100
                 emo_result[first_emotion] = fir_proba
+
+            s3_uploader = GetS3FileList(prefix='./media/', aws_access_key_id=AWS_ACCESS_KEY_ID,
+                                        aws_secret_access_key=AWS_SECRET_ACCESS_KEY, region=REGION,
+                                        bucket_name=BUCKET_NAME, s3_video_path=S3_VIDEO_PATH)
+            path_result = s3_uploader.upload_mp4_file(file_name=video_trans_name)
+            video_url = f"https://s3.{REGION}.amazonaws.com/{BUCKET_NAME}/{path_result}"
+
+            input_data = [(video_url, str(emo_result), DATE_TIME)]
+
+            print(input_data)
+
+            for video_url, emo_result, date_time in input_data:
+                JudgeStatus.objects.create(s3_path=video_url, emo_result=emo_result, cdate=date_time)
 
             return JsonResponse({"message": emo_result})
         return JsonResponse({"message": "not Post"})

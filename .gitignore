@@ -32,3 +32,7 @@ ENV/
 media/
 model/
 config/
+
+**/models.py
+./videoapp/models.py
+videoapp/models.py
