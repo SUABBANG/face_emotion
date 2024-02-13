@@ -7,7 +7,7 @@ __pycache__/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
-media
+face_emotion_project/media
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -31,3 +31,4 @@ ENV/
 
 videoapp/config/
 videoapp/trained_models/
+config/
